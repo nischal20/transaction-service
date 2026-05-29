@@ -108,7 +108,7 @@ This follows the spec: *"Transactions of type purchase and withdrawal are regist
 
 ## Audit Logging
 
-Every state-changing operation writes an entry to the `audit_logs` table:
+Every state-changing operation writes an entry to the `audit_logs` table (created by `migrations/002_audit_logs.sql`):
 
 | Event | Resource | Trigger |
 |-------|----------|---------|
@@ -117,9 +117,9 @@ Every state-changing operation writes an entry to the `audit_logs` table:
 
 Each entry captures the event type, affected resource, resource ID, and the `X-Request-ID` for cross-log tracing.
 
-**PostgreSQL mode** — the transaction row insert and its audit log entry are written inside a single database transaction. Both commit or both roll back, keeping the audit trail consistent with the `transactions` table.
+**Atomicity (PostgreSQL mode)** — the business row insert and its audit log entry are written inside the **same `*sql.Tx`**. The service begins a transaction, passes it explicitly to both the repository `Create` call and the `audit.Logger.Log` call, then commits. If either write fails the whole transaction rolls back — the audit trail is always consistent with the `accounts` and `transactions` tables.
 
-**In-memory mode** — audit logging is a no-op (`NoopLogger`).
+**In-memory mode** — audit logging is a no-op (`NoopLogger`). If the audit write fails it is logged as a warning and the operation still succeeds.
 
 ---
 
