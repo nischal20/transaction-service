@@ -2,11 +2,12 @@ package account
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"sync/atomic"
 
 	"github.com/nischalpatel/transactions-api/internal/model"
-	"github.com/nischalpatel/transactions-api/internal/repository"
+	accountrepo "github.com/nischalpatel/transactions-api/internal/repository/account"
 	"github.com/nischalpatel/transactions-api/internal/utils"
 )
 
@@ -25,14 +26,14 @@ func NewAccountStore() *AccountStore {
 	}
 }
 
-func (s *AccountStore) Create(ctx context.Context, documentNumber string) (*model.Account, error) {
+func (s *AccountStore) Create(ctx context.Context, _ *sql.Tx, documentNumber string) (*model.Account, error) {
 	utils.Logf(ctx, "repo[memory]: insert account document_number=%q", documentNumber)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, exists := s.docIndex[documentNumber]; exists {
 		utils.Logf(ctx, "repo[memory]: insert account failed: duplicate document_number=%q", documentNumber)
-		return nil, repository.ErrDuplicateDocument
+		return nil, accountrepo.ErrDuplicateDocument
 	}
 
 	id := s.counter.Add(1)
@@ -54,7 +55,7 @@ func (s *AccountStore) FindByID(ctx context.Context, accountID int64) (*model.Ac
 
 	if !ok {
 		utils.Logf(ctx, "repo[memory]: find account not found account_id=%d", accountID)
-		return nil, repository.ErrNotFound
+		return nil, accountrepo.ErrNotFound
 	}
 	utils.Logf(ctx, "repo[memory]: find account ok document_number=%q", acc.DocumentNumber)
 	return acc, nil

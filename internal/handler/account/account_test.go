@@ -45,7 +45,7 @@ func newAccountRouterWithSvc(svc svcaccount.AccountServicer) http.Handler {
 
 func newAccountRouter() http.Handler {
 	accStore := memaccount.NewAccountStore()
-	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{})
+	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{}, nil)
 	h := account.NewAccountHandler(accSvc)
 
 	r := chi.NewRouter()

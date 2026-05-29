@@ -19,8 +19,8 @@ import (
 func newTestRouter() http.Handler {
 	accStore := memaccount.NewAccountStore()
 	txStore := memtransaction.NewTransactionStore()
-	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{})
-	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{})
+	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{}, nil)
+	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{}, nil)
 
 	return handler.NewRouter(
 		handlerAccount.NewAccountHandler(accSvc),

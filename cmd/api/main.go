@@ -25,11 +25,12 @@ import (
 	"github.com/nischalpatel/transactions-api/internal/handler"
 	handlerAccount "github.com/nischalpatel/transactions-api/internal/handler/account"
 	handlerTransaction "github.com/nischalpatel/transactions-api/internal/handler/transaction"
-	"github.com/nischalpatel/transactions-api/internal/repository"
+	accountrepo "github.com/nischalpatel/transactions-api/internal/repository/account"
 	memaccount "github.com/nischalpatel/transactions-api/internal/repository/memory/account"
 	memtransaction "github.com/nischalpatel/transactions-api/internal/repository/memory/transaction"
 	pgaccount "github.com/nischalpatel/transactions-api/internal/repository/postgres/account"
 	pgtransaction "github.com/nischalpatel/transactions-api/internal/repository/postgres/transaction"
+	txrepo "github.com/nischalpatel/transactions-api/internal/repository/transaction"
 	svcaccount "github.com/nischalpatel/transactions-api/internal/service/account"
 	svctransaction "github.com/nischalpatel/transactions-api/internal/service/transaction"
 )
@@ -41,8 +42,8 @@ func main() {
 	}
 
 	var (
-		accRepo repository.AccountRepository
-		txRepo  repository.TransactionRepository
+		accRepo accountrepo.Repository
+		txRepo  txrepo.Repository
 		auditor audit.Logger
 		db      *sql.DB // non-nil only in postgres mode; closed during shutdown
 	)
@@ -72,8 +73,8 @@ func main() {
 		log.Println("storage: in-memory")
 	}
 
-	accSvc := svcaccount.NewAccountService(accRepo, auditor)
-	txSvc := svctransaction.NewTransactionService(txRepo, accRepo, auditor)
+	accSvc := svcaccount.NewAccountService(accRepo, auditor, db)
+	txSvc := svctransaction.NewTransactionService(txRepo, accRepo, auditor, db)
 
 	accHandler := handlerAccount.NewAccountHandler(accSvc)
 	txHandler := handlerTransaction.NewTransactionHandler(txSvc)

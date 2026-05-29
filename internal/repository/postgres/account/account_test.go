@@ -8,7 +8,7 @@ import (
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
-	"github.com/nischalpatel/transactions-api/internal/repository"
+	accountrepo "github.com/nischalpatel/transactions-api/internal/repository/account"
 	pgaccount "github.com/nischalpatel/transactions-api/internal/repository/postgres/account"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,8 +22,18 @@ func newMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	return db, mock
 }
 
+// beginTx sets up ExpectBegin on the mock and returns a *sql.Tx backed by it.
+func beginTx(t *testing.T, db *sql.DB, mock sqlmock.Sqlmock) *sql.Tx {
+	t.Helper()
+	mock.ExpectBegin()
+	tx, err := db.BeginTx(context.Background(), nil)
+	require.NoError(t, err)
+	return tx
+}
+
 func TestCreate_RunsInsertReturningQuery(t *testing.T) {
 	db, mock := newMock(t)
+	tx := beginTx(t, db, mock)
 
 	mock.ExpectQuery(`INSERT INTO accounts \(document_number\) VALUES \(\$1\) RETURNING account_id, document_number`).
 		WithArgs("12345678900").
@@ -31,7 +41,7 @@ func TestCreate_RunsInsertReturningQuery(t *testing.T) {
 			AddRow(1, "12345678900"))
 
 	store := pgaccount.NewAccountStore(db)
-	acc, err := store.Create(context.Background(), "12345678900")
+	acc, err := store.Create(context.Background(), tx, "12345678900")
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), acc.AccountID)
@@ -41,13 +51,14 @@ func TestCreate_RunsInsertReturningQuery(t *testing.T) {
 
 func TestCreate_DuplicateDocument_ReturnsFriendlyError(t *testing.T) {
 	db, mock := newMock(t)
+	tx := beginTx(t, db, mock)
 
 	mock.ExpectQuery(`INSERT INTO accounts`).
 		WithArgs("12345678900").
 		WillReturnError(&pq.Error{Code: "23505", Message: "duplicate key value violates unique constraint"})
 
 	store := pgaccount.NewAccountStore(db)
-	_, err := store.Create(context.Background(), "12345678900")
+	_, err := store.Create(context.Background(), tx, "12345678900")
 
 	assert.EqualError(t, err, "document_number already exists")
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -55,13 +66,14 @@ func TestCreate_DuplicateDocument_ReturnsFriendlyError(t *testing.T) {
 
 func TestCreate_DBError_WrapsError(t *testing.T) {
 	db, mock := newMock(t)
+	tx := beginTx(t, db, mock)
 
 	mock.ExpectQuery(`INSERT INTO accounts`).
 		WithArgs("12345678900").
 		WillReturnError(sql.ErrConnDone)
 
 	store := pgaccount.NewAccountStore(db)
-	_, err := store.Create(context.Background(), "12345678900")
+	_, err := store.Create(context.Background(), tx, "12345678900")
 
 	assert.ErrorContains(t, err, "insert account")
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -94,7 +106,7 @@ func TestFindByID_NotFound_ReturnsSentinelError(t *testing.T) {
 	store := pgaccount.NewAccountStore(db)
 	_, err := store.FindByID(context.Background(), 999)
 
-	assert.True(t, errors.Is(err, repository.ErrNotFound))
+	assert.True(t, errors.Is(err, accountrepo.ErrNotFound))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

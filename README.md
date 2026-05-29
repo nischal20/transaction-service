@@ -106,6 +106,23 @@ This follows the spec: *"Transactions of type purchase and withdrawal are regist
 
 ---
 
+## Audit Logging
+
+Every state-changing operation writes an entry to the `audit_logs` table:
+
+| Event | Resource | Trigger |
+|-------|----------|---------|
+| `account.created` | `account` | `POST /accounts` |
+| `transaction.created` | `transaction` | `POST /transactions` |
+
+Each entry captures the event type, affected resource, resource ID, and the `X-Request-ID` for cross-log tracing.
+
+**PostgreSQL mode** — the transaction row insert and its audit log entry are written inside a single database transaction. Both commit or both roll back, keeping the audit trail consistent with the `transactions` table.
+
+**In-memory mode** — audit logging is a no-op (`NoopLogger`).
+
+---
+
 ## Running Tests
 
 ```bash

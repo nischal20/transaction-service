@@ -19,21 +19,21 @@ func NewTransactionStore(db *sql.DB) *TransactionStore {
 	return &TransactionStore{db: db}
 }
 
-func (s *TransactionStore) Create(ctx context.Context, accountID, operationTypeID int64, amount float64, txType string) (*model.Transaction, error) {
+func (s *TransactionStore) Create(ctx context.Context, tx *sql.Tx, accountID, operationTypeID int64, amount float64, txType string) (*model.Transaction, error) {
 	utils.Logf(ctx, "repo[postgres]: insert transaction account_id=%d op_type=%d amount=%.2f", accountID, operationTypeID, amount)
-	var tx model.Transaction
-	err := s.db.QueryRowContext(ctx,
+	var t model.Transaction
+	err := tx.QueryRowContext(ctx,
 		`INSERT INTO transactions (account_id, operation_type_id, amount, type)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING transaction_id, account_id, operation_type_id, amount, type, event_date`,
 		accountID, operationTypeID, amount, txType,
-	).Scan(&tx.TransactionID, &tx.AccountID, &tx.OperationTypeID, &tx.Amount, &tx.Type, &tx.EventDate)
+	).Scan(&t.TransactionID, &t.AccountID, &t.OperationTypeID, &t.Amount, &t.Type, &t.EventDate)
 	if err != nil {
 		utils.Logf(ctx, "repo[postgres]: insert transaction error: %v", err)
 		return nil, fmt.Errorf("insert transaction: %w", err)
 	}
-	utils.Logf(ctx, "repo[postgres]: insert transaction ok transaction_id=%d type=%s", tx.TransactionID, tx.Type)
-	return &tx, nil
+	utils.Logf(ctx, "repo[postgres]: insert transaction ok transaction_id=%d type=%s", t.TransactionID, t.Type)
+	return &t, nil
 }
 
 func (s *TransactionStore) FindOperationType(ctx context.Context, operationTypeID int64) (*model.OperationType, error) {

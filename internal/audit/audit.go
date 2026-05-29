@@ -4,7 +4,10 @@
 // The actor field is nullable until authentication is added.
 package audit
 
-import "context"
+import (
+	"context"
+	"database/sql"
+)
 
 // EventType identifies what happened.
 type EventType string
@@ -25,6 +28,8 @@ type Entry struct {
 
 // Logger writes audit entries. Implementations must be safe for concurrent use.
 type Logger interface {
-	// Log records an audit entry. Returns an error if the write fails.
-	Log(ctx context.Context, entry Entry) error
+	// Log records an audit entry. tx must be the same live transaction that
+	// persisted the business row so both writes commit or roll back together;
+	// pass nil when no transaction is active.
+	Log(ctx context.Context, tx *sql.Tx, entry Entry) error
 }

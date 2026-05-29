@@ -17,9 +17,9 @@ func NewPostgresLogger(db *sql.DB) *PostgresLogger {
 	return &PostgresLogger{db: db}
 }
 
-func (l *PostgresLogger) Log(ctx context.Context, entry Entry) error {
+func (l *PostgresLogger) Log(ctx context.Context, tx *sql.Tx, entry Entry) error {
 	utils.Logf(ctx, "audit: log event_type=%s resource=%s resource_id=%d", entry.EventType, entry.Resource, entry.ResourceID)
-	_, err := l.db.ExecContext(ctx,
+	_, err := tx.ExecContext(ctx,
 		`INSERT INTO audit_logs (event_type, resource, resource_id, actor, request_id)
 		 VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''))`,
 		string(entry.EventType),

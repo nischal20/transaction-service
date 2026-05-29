@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	accountrepo "github.com/nischalpatel/transactions-api/internal/repository/account"
 	memaccount "github.com/nischalpatel/transactions-api/internal/repository/memory/account"
-	"github.com/nischalpatel/transactions-api/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +16,7 @@ import (
 func TestAccountStore_Create_Success(t *testing.T) {
 	store := memaccount.NewAccountStore()
 
-	acc, err := store.Create(context.Background(), "12345678900")
+	acc, err := store.Create(context.Background(), nil, "12345678900")
 	require.NoError(t, err)
 	assert.Greater(t, acc.AccountID, int64(0))
 	assert.Equal(t, "12345678900", acc.DocumentNumber)
@@ -25,9 +25,9 @@ func TestAccountStore_Create_Success(t *testing.T) {
 func TestAccountStore_Create_UniqueIDs(t *testing.T) {
 	store := memaccount.NewAccountStore()
 
-	acc1, err := store.Create(context.Background(), "11111111111")
+	acc1, err := store.Create(context.Background(), nil, "11111111111")
 	require.NoError(t, err)
-	acc2, err := store.Create(context.Background(), "22222222222")
+	acc2, err := store.Create(context.Background(), nil, "22222222222")
 	require.NoError(t, err)
 
 	assert.NotEqual(t, acc1.AccountID, acc2.AccountID)
@@ -36,17 +36,17 @@ func TestAccountStore_Create_UniqueIDs(t *testing.T) {
 func TestAccountStore_Create_DuplicateDocument(t *testing.T) {
 	store := memaccount.NewAccountStore()
 
-	_, err := store.Create(context.Background(), "12345678900")
+	_, err := store.Create(context.Background(), nil, "12345678900")
 	require.NoError(t, err)
 
-	_, err = store.Create(context.Background(), "12345678900")
+	_, err = store.Create(context.Background(), nil, "12345678900")
 	assert.EqualError(t, err, "document_number already exists")
 }
 
 func TestAccountStore_FindByID_Found(t *testing.T) {
 	store := memaccount.NewAccountStore()
 
-	created, err := store.Create(context.Background(), "12345678900")
+	created, err := store.Create(context.Background(), nil, "12345678900")
 	require.NoError(t, err)
 
 	found, err := store.FindByID(context.Background(), created.AccountID)
@@ -59,7 +59,7 @@ func TestAccountStore_FindByID_NotFound(t *testing.T) {
 	store := memaccount.NewAccountStore()
 
 	_, err := store.FindByID(context.Background(), 999)
-	assert.True(t, errors.Is(err, repository.ErrNotFound))
+	assert.True(t, errors.Is(err, accountrepo.ErrNotFound))
 }
 
 func TestAccountStore_FindByID_NotFound_EmptyStore(t *testing.T) {
@@ -80,7 +80,7 @@ func TestAccountStore_Create_ConcurrentSafe(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, errs[i] = store.Create(context.Background(), fmt.Sprintf("%011d", i))
+			_, errs[i] = store.Create(context.Background(), nil, fmt.Sprintf("%011d", i))
 		}(i)
 	}
 	wg.Wait()
@@ -101,7 +101,7 @@ func TestAccountStore_Create_ConcurrentDuplicate(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, errs[i] = store.Create(context.Background(), "same-document")
+			_, errs[i] = store.Create(context.Background(), nil, "same-document")
 		}(i)
 	}
 	wg.Wait()

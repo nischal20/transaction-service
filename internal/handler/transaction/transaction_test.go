@@ -43,8 +43,8 @@ func newTransactionRouterWithStub(svc svctransaction.TransactionServicer) http.H
 func newTransactionRouter() http.Handler {
 	accStore := memaccount.NewAccountStore()
 	txStore := memtransaction.NewTransactionStore()
-	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{})
-	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{})
+	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{}, nil)
+	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{}, nil)
 
 	accHandler := account.NewAccountHandler(accSvc)
 	txHandler := transaction.NewTransactionHandler(txSvc)

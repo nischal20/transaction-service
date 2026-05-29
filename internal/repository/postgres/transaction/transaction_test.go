@@ -21,8 +21,18 @@ func newMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	return db, mock
 }
 
+// beginTx sets up ExpectBegin on the mock and returns a *sql.Tx backed by it.
+func beginTx(t *testing.T, db *sql.DB, mock sqlmock.Sqlmock) *sql.Tx {
+	t.Helper()
+	mock.ExpectBegin()
+	tx, err := db.BeginTx(context.Background(), nil)
+	require.NoError(t, err)
+	return tx
+}
+
 func TestTransactionCreate_RunsInsertReturningQuery(t *testing.T) {
 	db, mock := newMock(t)
+	tx := beginTx(t, db, mock)
 	eventDate := time.Now().UTC()
 
 	mock.ExpectQuery(`INSERT INTO transactions \(account_id, operation_type_id, amount, type\)\s+VALUES \(\$1, \$2, \$3, \$4\)\s+RETURNING transaction_id, account_id, operation_type_id, amount, type, event_date`).
@@ -31,18 +41,19 @@ func TestTransactionCreate_RunsInsertReturningQuery(t *testing.T) {
 			AddRow(1, 1, model.OperationNormalPurchase, -100.0, "debit", eventDate))
 
 	store := pgtransaction.NewTransactionStore(db)
-	tx, err := store.Create(context.Background(), 1, model.OperationNormalPurchase, -100.0, "debit")
+	result, err := store.Create(context.Background(), tx, 1, model.OperationNormalPurchase, -100.0, "debit")
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(1), tx.TransactionID)
-	assert.Equal(t, -100.0, tx.Amount)
-	assert.Equal(t, "debit", tx.Type)
-	assert.Equal(t, eventDate, tx.EventDate)
+	assert.Equal(t, int64(1), result.TransactionID)
+	assert.Equal(t, -100.0, result.Amount)
+	assert.Equal(t, "debit", result.Type)
+	assert.Equal(t, eventDate, result.EventDate)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestTransactionCreate_CreditVoucher(t *testing.T) {
 	db, mock := newMock(t)
+	tx := beginTx(t, db, mock)
 	eventDate := time.Now().UTC()
 
 	mock.ExpectQuery(`INSERT INTO transactions`).
@@ -51,23 +62,24 @@ func TestTransactionCreate_CreditVoucher(t *testing.T) {
 			AddRow(2, 2, model.OperationCreditVoucher, 50.0, "credit", eventDate))
 
 	store := pgtransaction.NewTransactionStore(db)
-	tx, err := store.Create(context.Background(), 2, model.OperationCreditVoucher, 50.0, "credit")
+	result, err := store.Create(context.Background(), tx, 2, model.OperationCreditVoucher, 50.0, "credit")
 
 	require.NoError(t, err)
-	assert.Equal(t, 50.0, tx.Amount)
-	assert.Equal(t, "credit", tx.Type)
+	assert.Equal(t, 50.0, result.Amount)
+	assert.Equal(t, "credit", result.Type)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestTransactionCreate_DBError_WrapsError(t *testing.T) {
 	db, mock := newMock(t)
+	tx := beginTx(t, db, mock)
 
 	mock.ExpectQuery(`INSERT INTO transactions`).
 		WithArgs(int64(1), int64(model.OperationNormalPurchase), -100.0, "debit").
 		WillReturnError(sql.ErrConnDone)
 
 	store := pgtransaction.NewTransactionStore(db)
-	_, err := store.Create(context.Background(), 1, model.OperationNormalPurchase, -100.0, "debit")
+	_, err := store.Create(context.Background(), tx, 1, model.OperationNormalPurchase, -100.0, "debit")
 
 	assert.ErrorContains(t, err, "insert transaction")
 	assert.NoError(t, mock.ExpectationsWereMet())

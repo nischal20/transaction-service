@@ -13,7 +13,7 @@ import (
 func TestTransactionStore_Create_Success(t *testing.T) {
 	store := memtransaction.NewTransactionStore()
 
-	tx, err := store.Create(context.Background(), 1, model.OperationNormalPurchase, -100.0, "debit")
+	tx, err := store.Create(context.Background(), nil, 1, model.OperationNormalPurchase, -100.0, "debit")
 	require.NoError(t, err)
 	assert.Greater(t, tx.TransactionID, int64(0))
 	assert.Equal(t, int64(1), tx.AccountID)
@@ -27,9 +27,9 @@ func TestTransactionStore_Create_SetsTypeFromOperationType(t *testing.T) {
 	store := memtransaction.NewTransactionStore()
 
 	cases := []struct {
-		opType       int64
-		amount       float64
-		txType       string
+		opType int64
+		amount float64
+		txType string
 	}{
 		{model.OperationNormalPurchase, -50.0, "debit"},
 		{model.OperationPurchaseInstallments, -75.5, "debit"},
@@ -38,7 +38,7 @@ func TestTransactionStore_Create_SetsTypeFromOperationType(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tx, err := store.Create(context.Background(), 1, tc.opType, tc.amount, tc.txType)
+		tx, err := store.Create(context.Background(), nil, 1, tc.opType, tc.amount, tc.txType)
 		require.NoError(t, err)
 		assert.Equal(t, tc.amount, tx.Amount, "op_type=%d", tc.opType)
 		assert.Equal(t, tc.txType, tx.Type, "op_type=%d", tc.opType)
@@ -48,9 +48,9 @@ func TestTransactionStore_Create_SetsTypeFromOperationType(t *testing.T) {
 func TestTransactionStore_Create_UniqueIDs(t *testing.T) {
 	store := memtransaction.NewTransactionStore()
 
-	tx1, err := store.Create(context.Background(), 1, model.OperationNormalPurchase, -10.0, "debit")
+	tx1, err := store.Create(context.Background(), nil, 1, model.OperationNormalPurchase, -10.0, "debit")
 	require.NoError(t, err)
-	tx2, err := store.Create(context.Background(), 1, model.OperationCreditVoucher, 20.0, "credit")
+	tx2, err := store.Create(context.Background(), nil, 1, model.OperationCreditVoucher, 20.0, "credit")
 	require.NoError(t, err)
 
 	assert.NotEqual(t, tx1.TransactionID, tx2.TransactionID)

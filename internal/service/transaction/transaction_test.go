@@ -2,6 +2,7 @@ package transaction_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -21,7 +22,7 @@ type stubTxRepo struct {
 	createErr error
 }
 
-func (s *stubTxRepo) Create(ctx context.Context, accountID, operationTypeID int64, amount float64, txType string) (*model.Transaction, error) {
+func (s *stubTxRepo) Create(ctx context.Context, tx *sql.Tx, accountID, operationTypeID int64, amount float64, txType string) (*model.Transaction, error) {
 	return nil, s.createErr
 }
 
@@ -34,11 +35,11 @@ func setupTxService(t *testing.T) (*svctransaction.TransactionService, int64) {
 	accStore := memaccount.NewAccountStore()
 	txStore := memtransaction.NewTransactionStore()
 
-	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{})
+	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{}, nil)
 	acc, err := accSvc.CreateAccount(context.Background(), "12345678900")
 	require.NoError(t, err)
 
-	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{})
+	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{}, nil)
 	return txSvc, acc.AccountID
 }
 
@@ -184,10 +185,10 @@ func TestCreateTransaction_EventDateIsSet(t *testing.T) {
 
 func TestCreateTransaction_RepoCreateError(t *testing.T) {
 	accStore := memaccount.NewAccountStore()
-	acc, err := accStore.Create(context.Background(), "12345678900")
+	acc, err := accStore.Create(context.Background(), nil, "12345678900")
 	require.NoError(t, err)
 
-	svc := svctransaction.NewTransactionService(&stubTxRepo{createErr: errors.New("storage failure")}, accStore, audit.NoopLogger{})
+	svc := svctransaction.NewTransactionService(&stubTxRepo{createErr: errors.New("storage failure")}, accStore, audit.NoopLogger{}, nil)
 
 	_, err = svc.CreateTransaction(context.Background(), acc.AccountID, model.OperationNormalPurchase, 10.0)
 	assert.EqualError(t, err, "storage failure")

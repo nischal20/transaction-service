@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -31,7 +32,7 @@ func NewTransactionStore() *TransactionStore {
 	return s
 }
 
-func (s *TransactionStore) Create(ctx context.Context, accountID, operationTypeID int64, amount float64, txType string) (*model.Transaction, error) {
+func (s *TransactionStore) Create(ctx context.Context, _ *sql.Tx, accountID, operationTypeID int64, amount float64, txType string) (*model.Transaction, error) {
 	utils.Logf(ctx, "repo[memory]: insert transaction account_id=%d op_type=%d amount=%.2f", accountID, operationTypeID, amount)
 	id := s.counter.Add(1)
 	tx := &model.Transaction{

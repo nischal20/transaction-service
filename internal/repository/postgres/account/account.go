@@ -8,7 +8,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/nischalpatel/transactions-api/internal/model"
-	"github.com/nischalpatel/transactions-api/internal/repository"
+	accountrepo "github.com/nischalpatel/transactions-api/internal/repository/account"
 	"github.com/nischalpatel/transactions-api/internal/utils"
 )
 
@@ -21,10 +21,10 @@ func NewAccountStore(db *sql.DB) *AccountStore {
 	return &AccountStore{db: db}
 }
 
-func (s *AccountStore) Create(ctx context.Context, documentNumber string) (*model.Account, error) {
+func (s *AccountStore) Create(ctx context.Context, tx *sql.Tx, documentNumber string) (*model.Account, error) {
 	utils.Logf(ctx, "repo[postgres]: insert account document_number=%q", documentNumber)
 	var acc model.Account
-	err := s.db.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		`INSERT INTO accounts (document_number) VALUES ($1) RETURNING account_id, document_number`,
 		documentNumber,
 	).Scan(&acc.AccountID, &acc.DocumentNumber)
@@ -32,7 +32,7 @@ func (s *AccountStore) Create(ctx context.Context, documentNumber string) (*mode
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
 			utils.Logf(ctx, "repo[postgres]: insert account failed: duplicate document_number=%q", documentNumber)
-			return nil, repository.ErrDuplicateDocument
+			return nil, accountrepo.ErrDuplicateDocument
 		}
 		utils.Logf(ctx, "repo[postgres]: insert account error: %v", err)
 		return nil, fmt.Errorf("insert account: %w", err)
@@ -50,7 +50,7 @@ func (s *AccountStore) FindByID(ctx context.Context, accountID int64) (*model.Ac
 	).Scan(&acc.AccountID, &acc.DocumentNumber)
 	if errors.Is(err, sql.ErrNoRows) {
 		utils.Logf(ctx, "repo[postgres]: find account not found account_id=%d", accountID)
-		return nil, repository.ErrNotFound
+		return nil, accountrepo.ErrNotFound
 	}
 	if err != nil {
 		utils.Logf(ctx, "repo[postgres]: find account error: %v", err)

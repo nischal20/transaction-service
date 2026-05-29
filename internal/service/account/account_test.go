@@ -12,7 +12,7 @@ import (
 )
 
 func newAccountService() *svcaccount.AccountService {
-	return svcaccount.NewAccountService(memaccount.NewAccountStore(), audit.NoopLogger{})
+	return svcaccount.NewAccountService(memaccount.NewAccountStore(), audit.NoopLogger{}, nil)
 }
 
 func TestCreateAccount_Success(t *testing.T) {
