@@ -1,0 +1,163 @@
+basePath: /
+definitions:
+  handler.accountResponse:
+    properties:
+      account_id:
+        example: 1
+        type: integer
+      document_number:
+        example: "12345678900"
+        type: string
+    type: object
+  handler.createAccountRequest:
+    properties:
+      document_number:
+        example: "12345678900"
+        type: string
+    type: object
+  handler.createTransactionRequest:
+    properties:
+      account_id:
+        example: 1
+        type: integer
+      amount:
+        example: 50
+        type: number
+      operation_type_id:
+        example: 1
+        type: integer
+    type: object
+  handler.errorResponse:
+    properties:
+      error:
+        example: account not found
+        type: string
+    type: object
+  handler.transactionResponse:
+    properties:
+      account_id:
+        example: 1
+        type: integer
+      amount:
+        example: -100.5
+        type: number
+      event_date:
+        example: "2026-05-28T17:00:00Z"
+        type: string
+      operation_type_id:
+        example: 1
+        type: integer
+      transaction_id:
+        example: 1
+        type: integer
+      type:
+        example: debit
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Pismo-style transactions service. Manage cardholder accounts and record
+    financial operations.
+  title: Transactions Service
+  version: "1.0"
+paths:
+  /accounts:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new cardholder account with the given document number
+      parameters:
+      - description: Account payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.createAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.accountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Create an account
+      tags:
+      - accounts
+  /accounts/{accountId}:
+    get:
+      description: Returns a single account by its numeric ID
+      parameters:
+      - description: Account ID
+        in: path
+        name: accountId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.accountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Get an account
+      tags:
+      - accounts
+  /transactions:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Records a financial operation against an existing account.
+        Operation type IDs: 1=Normal Purchase, 2=Purchase with installments, 3=Withdrawal, 4=Credit Voucher.
+        Send a positive amount. The server applies the correct sign based on operation type.
+      parameters:
+      - description: Transaction payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.createTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.transactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Create a transaction
+      tags:
+      - transactions
+swagger: "2.0"
