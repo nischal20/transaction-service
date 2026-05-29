@@ -6,6 +6,7 @@ import (
 )
 
 type requestIDKey struct{}
+type actorKey struct{}
 
 // NewRequestID returns a copy of ctx with the request ID stored inside.
 func NewRequestID(ctx context.Context, id string) context.Context {
@@ -17,6 +18,23 @@ func NewRequestID(ctx context.Context, id string) context.Context {
 func RequestIDFromCtx(ctx context.Context) string {
 	if id, ok := ctx.Value(requestIDKey{}).(string); ok {
 		return id
+	}
+	return ""
+}
+
+// WithActor returns a copy of ctx with the actor stored inside.
+// The actor is set from the X-User-ID request header until authentication
+// is added, at which point the middleware will populate it from the auth token
+// instead — no other code needs to change.
+func WithActor(ctx context.Context, actor string) context.Context {
+	return context.WithValue(ctx, actorKey{}, actor)
+}
+
+// ActorFromCtx retrieves the actor stored by WithActor.
+// Returns "" if no actor is present.
+func ActorFromCtx(ctx context.Context) string {
+	if actor, ok := ctx.Value(actorKey{}).(string); ok {
+		return actor
 	}
 	return ""
 }

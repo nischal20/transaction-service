@@ -44,7 +44,8 @@ func (h *TransactionHandler) CreateTransaction(w http.ResponseWriter, r *http.Re
 	}
 	utils.Logf(r.Context(), "handler: create transaction: account_id=%d op_type=%d amount=%.2f", body.AccountID, body.OperationTypeID, body.Amount)
 
-	tx, err := h.svc.CreateTransaction(r.Context(), body.AccountID, body.OperationTypeID, body.Amount)
+	ctx := utils.WithActor(r.Context(), r.Header.Get("X-User-ID"))
+	tx, err := h.svc.CreateTransaction(ctx, body.AccountID, body.OperationTypeID, body.Amount)
 	if err != nil {
 		utils.Logf(r.Context(), "handler: create transaction: error: %v", err)
 		switch {

@@ -43,7 +43,8 @@ func (h *AccountHandler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	utils.Logf(r.Context(), "handler: create account: document_number=%q", body.DocumentNumber)
 
-	acc, err := h.svc.CreateAccount(r.Context(), body.DocumentNumber)
+	ctx := utils.WithActor(r.Context(), r.Header.Get("X-User-ID"))
+	acc, err := h.svc.CreateAccount(ctx, body.DocumentNumber)
 	if err != nil {
 		utils.Logf(r.Context(), "handler: create account: error: %v", err)
 		switch {

@@ -96,6 +96,7 @@ func (s *TransactionService) createWithDBTx(ctx context.Context, accountID, oper
 		EventType:  audit.EventTransactionCreated,
 		Resource:   "transaction",
 		ResourceID: tx.TransactionID,
+		Actor:      utils.ActorFromCtx(ctx),
 		RequestID:  utils.RequestIDFromCtx(ctx),
 	}); err != nil {
 		_ = sqlTx.Rollback()
@@ -122,6 +123,7 @@ func (s *TransactionService) createInMemory(ctx context.Context, accountID, oper
 		EventType:  audit.EventTransactionCreated,
 		Resource:   "transaction",
 		ResourceID: tx.TransactionID,
+		Actor:      utils.ActorFromCtx(ctx),
 		RequestID:  utils.RequestIDFromCtx(ctx),
 	}); err != nil {
 		utils.Logf(ctx, "service: create transaction: audit log warning (non-fatal): %v", err)

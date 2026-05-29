@@ -7,10 +7,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	httpSwagger "github.com/swaggo/http-swagger"
 	handlerAccount "github.com/nischalpatel/transactions-api/internal/handler/account"
 	handlerTransaction "github.com/nischalpatel/transactions-api/internal/handler/transaction"
 	"github.com/nischalpatel/transactions-api/internal/utils"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 const maxBodyBytes = 1 << 20 // 1 MB
@@ -26,7 +26,9 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-func logging(next http.Handler) http.Handler {
+// requestLogger assigns a unique request ID, sets the X-Request-ID response
+// header, and logs method, path, status, and duration for every request.
+func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := uuid.New().String()
 		r = r.WithContext(utils.NewRequestID(r.Context(), id))
@@ -47,7 +49,7 @@ func maxBodyLimit(next http.Handler) http.Handler {
 func NewRouter(accounts *handlerAccount.AccountHandler, transactions *handlerTransaction.TransactionHandler) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(logging)
+	r.Use(requestLogger)
 	r.Use(maxBodyLimit)
 
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {

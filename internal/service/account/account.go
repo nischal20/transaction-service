@@ -71,6 +71,7 @@ func (s *AccountService) createWithDBTx(ctx context.Context, documentNumber stri
 		EventType:  audit.EventAccountCreated,
 		Resource:   "account",
 		ResourceID: acc.AccountID,
+		Actor:      utils.ActorFromCtx(ctx),
 		RequestID:  utils.RequestIDFromCtx(ctx),
 	}); err != nil {
 		_ = sqlTx.Rollback()
@@ -100,6 +101,7 @@ func (s *AccountService) createInMemory(ctx context.Context, documentNumber stri
 		EventType:  audit.EventAccountCreated,
 		Resource:   "account",
 		ResourceID: acc.AccountID,
+		Actor:      utils.ActorFromCtx(ctx),
 		RequestID:  utils.RequestIDFromCtx(ctx),
 	}); err != nil {
 		utils.Logf(ctx, "service: create account: audit log warning (non-fatal): %v", err)
