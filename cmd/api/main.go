@@ -21,6 +21,7 @@ import (
 	"github.com/nischalpatel/transactions-api/config"
 	"github.com/nischalpatel/transactions-api/database"
 	_ "github.com/nischalpatel/transactions-api/docs"
+	"github.com/nischalpatel/transactions-api/internal/audit"
 	"github.com/nischalpatel/transactions-api/internal/handler"
 	handlerAccount "github.com/nischalpatel/transactions-api/internal/handler/account"
 	handlerTransaction "github.com/nischalpatel/transactions-api/internal/handler/transaction"
@@ -42,6 +43,7 @@ func main() {
 	var (
 		accRepo repository.AccountRepository
 		txRepo  repository.TransactionRepository
+		auditor audit.Logger
 		db      *sql.DB // non-nil only in postgres mode; closed during shutdown
 	)
 
@@ -60,16 +62,18 @@ func main() {
 		}
 		accRepo = pgaccount.NewAccountStore(db)
 		txRepo = pgtransaction.NewTransactionStore(db)
+		auditor = audit.NewPostgresLogger(db)
 		log.Println("storage: PostgreSQL")
 
 	default:
 		accRepo = memaccount.NewAccountStore()
 		txRepo = memtransaction.NewTransactionStore()
+		auditor = audit.NoopLogger{}
 		log.Println("storage: in-memory")
 	}
 
-	accSvc := svcaccount.NewAccountService(accRepo)
-	txSvc := svctransaction.NewTransactionService(txRepo, accRepo)
+	accSvc := svcaccount.NewAccountService(accRepo, auditor)
+	txSvc := svctransaction.NewTransactionService(txRepo, accRepo, auditor)
 
 	accHandler := handlerAccount.NewAccountHandler(accSvc)
 	txHandler := handlerTransaction.NewTransactionHandler(txSvc)

@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/nischalpatel/transactions-api/internal/audit"
 	"github.com/nischalpatel/transactions-api/internal/handler"
 	handlerAccount "github.com/nischalpatel/transactions-api/internal/handler/account"
 	handlerTransaction "github.com/nischalpatel/transactions-api/internal/handler/transaction"
@@ -18,8 +19,8 @@ import (
 func newTestRouter() http.Handler {
 	accStore := memaccount.NewAccountStore()
 	txStore := memtransaction.NewTransactionStore()
-	accSvc := svcaccount.NewAccountService(accStore)
-	txSvc := svctransaction.NewTransactionService(txStore, accStore)
+	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{})
+	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{})
 
 	return handler.NewRouter(
 		handlerAccount.NewAccountHandler(accSvc),

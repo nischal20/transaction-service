@@ -4,10 +4,10 @@ import "time"
 
 // OperationType IDs as defined in the requirements.
 const (
-	OperationNormalPurchase         = 1
-	OperationPurchaseInstallments   = 2
-	OperationWithdrawal             = 3
-	OperationCreditVoucher          = 4
+	OperationNormalPurchase       = 1
+	OperationPurchaseInstallments = 2
+	OperationWithdrawal           = 3
+	OperationCreditVoucher        = 4
 )
 
 // OperationType describes the kind of transaction.

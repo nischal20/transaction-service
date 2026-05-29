@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nischalpatel/transactions-api/internal/apperr"
+	"github.com/nischalpatel/transactions-api/internal/audit"
 	"github.com/nischalpatel/transactions-api/internal/model"
 	"github.com/nischalpatel/transactions-api/internal/repository"
 	"github.com/nischalpatel/transactions-api/internal/utils"
@@ -26,11 +27,12 @@ type AccountServicer interface {
 
 // AccountService handles business logic for accounts.
 type AccountService struct {
-	repo repository.AccountRepository
+	repo    repository.AccountRepository
+	auditor audit.Logger
 }
 
-func NewAccountService(repo repository.AccountRepository) *AccountService {
-	return &AccountService{repo: repo}
+func NewAccountService(repo repository.AccountRepository, auditor audit.Logger) *AccountService {
+	return &AccountService{repo: repo, auditor: auditor}
 }
 
 // CreateAccount validates input and persists a new account.
@@ -50,6 +52,14 @@ func (s *AccountService) CreateAccount(ctx context.Context, documentNumber strin
 		return nil, err
 	}
 	utils.Logf(ctx, "service: create account: created account_id=%d", acc.AccountID)
+	if err := s.auditor.Log(ctx, audit.Entry{
+		EventType:  audit.EventAccountCreated,
+		Resource:   "account",
+		ResourceID: acc.AccountID,
+		RequestID:  utils.RequestIDFromCtx(ctx),
+	}); err != nil {
+		utils.Logf(ctx, "service: create account: audit log warning (non-fatal): %v", err)
+	}
 	return acc, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/nischalpatel/transactions-api/internal/audit"
 	memaccount "github.com/nischalpatel/transactions-api/internal/repository/memory/account"
 	svcaccount "github.com/nischalpatel/transactions-api/internal/service/account"
 	"github.com/stretchr/testify/assert"
@@ -11,7 +12,7 @@ import (
 )
 
 func newAccountService() *svcaccount.AccountService {
-	return svcaccount.NewAccountService(memaccount.NewAccountStore())
+	return svcaccount.NewAccountService(memaccount.NewAccountStore(), audit.NoopLogger{})
 }
 
 func TestCreateAccount_Success(t *testing.T) {

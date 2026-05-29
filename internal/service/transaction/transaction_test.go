@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/nischalpatel/transactions-api/internal/audit"
 	"github.com/nischalpatel/transactions-api/internal/model"
 	memaccount "github.com/nischalpatel/transactions-api/internal/repository/memory/account"
 	memtransaction "github.com/nischalpatel/transactions-api/internal/repository/memory/transaction"
@@ -33,11 +34,11 @@ func setupTxService(t *testing.T) (*svctransaction.TransactionService, int64) {
 	accStore := memaccount.NewAccountStore()
 	txStore := memtransaction.NewTransactionStore()
 
-	accSvc := svcaccount.NewAccountService(accStore)
+	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{})
 	acc, err := accSvc.CreateAccount(context.Background(), "12345678900")
 	require.NoError(t, err)
 
-	txSvc := svctransaction.NewTransactionService(txStore, accStore)
+	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{})
 	return txSvc, acc.AccountID
 }
 
@@ -186,7 +187,7 @@ func TestCreateTransaction_RepoCreateError(t *testing.T) {
 	acc, err := accStore.Create(context.Background(), "12345678900")
 	require.NoError(t, err)
 
-	svc := svctransaction.NewTransactionService(&stubTxRepo{createErr: errors.New("storage failure")}, accStore)
+	svc := svctransaction.NewTransactionService(&stubTxRepo{createErr: errors.New("storage failure")}, accStore, audit.NoopLogger{})
 
 	_, err = svc.CreateTransaction(context.Background(), acc.AccountID, model.OperationNormalPurchase, 10.0)
 	assert.EqualError(t, err, "storage failure")

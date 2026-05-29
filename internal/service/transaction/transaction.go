@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/nischalpatel/transactions-api/internal/apperr"
+	"github.com/nischalpatel/transactions-api/internal/audit"
 	"github.com/nischalpatel/transactions-api/internal/model"
 	"github.com/nischalpatel/transactions-api/internal/repository"
 	"github.com/nischalpatel/transactions-api/internal/utils"
@@ -18,20 +19,21 @@ type TransactionServicer interface {
 	// Returns apperr.ErrValidation for bad input, apperr.ErrNotFound if the account
 	// or operation type does not exist.
 	CreateTransaction(ctx context.Context, accountID, operationTypeID int64, amount float64) (*model.Transaction, error)
-
 }
 
 // TransactionService handles business logic for transactions.
 type TransactionService struct {
 	txRepo  repository.TransactionRepository
 	accRepo repository.AccountRepository
+	auditor audit.Logger
 }
 
 func NewTransactionService(
 	txRepo repository.TransactionRepository,
 	accRepo repository.AccountRepository,
+	auditor audit.Logger,
 ) *TransactionService {
-	return &TransactionService{txRepo: txRepo, accRepo: accRepo}
+	return &TransactionService{txRepo: txRepo, accRepo: accRepo, auditor: auditor}
 }
 
 // CreateTransaction validates input and persists the transaction.
@@ -76,6 +78,13 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID, o
 		return nil, err
 	}
 	utils.Logf(ctx, "service: create transaction: created transaction_id=%d type=%s", tx.TransactionID, tx.Type)
+	if err := s.auditor.Log(ctx, audit.Entry{
+		EventType:  audit.EventTransactionCreated,
+		Resource:   "transaction",
+		ResourceID: tx.TransactionID,
+		RequestID:  utils.RequestIDFromCtx(ctx),
+	}); err != nil {
+		utils.Logf(ctx, "service: create transaction: audit log warning (non-fatal): %v", err)
+	}
 	return tx, nil
 }
-

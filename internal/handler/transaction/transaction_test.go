@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/nischalpatel/transactions-api/internal/apperr"
+	"github.com/nischalpatel/transactions-api/internal/audit"
 	"github.com/nischalpatel/transactions-api/internal/handler/account"
 	"github.com/nischalpatel/transactions-api/internal/handler/transaction"
 	"github.com/nischalpatel/transactions-api/internal/model"
@@ -42,8 +43,8 @@ func newTransactionRouterWithStub(svc svctransaction.TransactionServicer) http.H
 func newTransactionRouter() http.Handler {
 	accStore := memaccount.NewAccountStore()
 	txStore := memtransaction.NewTransactionStore()
-	accSvc := svcaccount.NewAccountService(accStore)
-	txSvc := svctransaction.NewTransactionService(txStore, accStore)
+	accSvc := svcaccount.NewAccountService(accStore, audit.NoopLogger{})
+	txSvc := svctransaction.NewTransactionService(txStore, accStore, audit.NoopLogger{})
 
 	accHandler := account.NewAccountHandler(accSvc)
 	txHandler := transaction.NewTransactionHandler(txSvc)
