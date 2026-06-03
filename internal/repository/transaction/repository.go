@@ -16,6 +16,9 @@ type Repository interface {
 	// amount and txType are pre-computed by the service layer.
 	Create(ctx context.Context, tx *sql.Tx, accountID, operationTypeID int64, amount int64, txType string) (*model.Transaction, error)
 
+	// FindByID retrieves a transaction by its primary key.
+	FindByID(ctx context.Context, transactionID int64) (*model.Transaction, error)
+
 	// FindOperationType retrieves an operation type by its numeric ID.
 	// Returns an error if the operation type does not exist.
 	FindOperationType(ctx context.Context, operationTypeID int64) (*model.OperationType, error)

@@ -36,6 +36,23 @@ func (s *TransactionStore) Create(ctx context.Context, tx *sql.Tx, accountID, op
 	return &t, nil
 }
 
+func (s *TransactionStore) FindByID(ctx context.Context, transactionID int64) (*model.Transaction, error) {
+	utils.Logf(ctx, "repo[postgres]: find transaction transaction_id=%d", transactionID)
+	var t model.Transaction
+	err := s.db.QueryRowContext(ctx,
+		`SELECT transaction_id, account_id, operation_type_id, amount, type, event_date
+		 FROM transactions WHERE transaction_id = $1`,
+		transactionID,
+	).Scan(&t.TransactionID, &t.AccountID, &t.OperationTypeID, &t.Amount, &t.Type, &t.EventDate)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("transaction %d not found", transactionID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find transaction: %w", err)
+	}
+	return &t, nil
+}
+
 func (s *TransactionStore) FindOperationType(ctx context.Context, operationTypeID int64) (*model.OperationType, error) {
 	utils.Logf(ctx, "repo[postgres]: find operation_type op_type=%d", operationTypeID)
 	var ot model.OperationType

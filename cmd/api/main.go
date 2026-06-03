@@ -50,11 +50,15 @@ func main() {
 	}
 	log.Println("storage: PostgreSQL")
 
-	accSvc := svcaccount.NewAccountService(pgaccount.NewAccountStore(db), audit.NewPostgresLogger(db), db)
-	txSvc := svctransaction.NewTransactionService(pgtransaction.NewTransactionStore(db), pgaccount.NewAccountStore(db), audit.NewPostgresLogger(db), db)
+	idemStore := idempotency.NewPostgresStore(db)
+	accStore := pgaccount.NewAccountStore(db)
+	auditor := audit.NewPostgresLogger(db)
+
+	accSvc := svcaccount.NewAccountService(accStore, auditor, db)
+	txSvc := svctransaction.NewTransactionService(pgtransaction.NewTransactionStore(db), accStore, auditor, idemStore, db)
 
 	accHandler := handlerAccount.NewAccountHandler(accSvc)
-	txHandler := handlerTransaction.NewTransactionHandler(txSvc, idempotency.NewPostgresStore(db))
+	txHandler := handlerTransaction.NewTransactionHandler(txSvc)
 
 	// ── API server ────────────────────────────────────────────────────────────
 	apiSrv := &http.Server{

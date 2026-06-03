@@ -2,22 +2,23 @@ package idempotency
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
-// Record is a cached HTTP response stored for a given idempotency key.
+// Record is the idempotency entry stored for a given key.
 type Record struct {
-	Key          string
-	RequestHash  string // SHA-256 of the raw request body
-	ResponseCode int
-	ResponseBody []byte
-	CreatedAt    time.Time
+	Key           string
+	RequestHash   string // SHA-256 of the raw request body
+	TransactionID int64
+	CreatedAt     time.Time
 }
 
 // Repository stores and retrieves idempotency records.
 type Repository interface {
-	// Find returns the cached record for key, or (nil, nil) when not found.
+	// Find returns the record for key, or (nil, nil) when not found.
 	Find(ctx context.Context, key string) (*Record, error)
-	// Save persists a new record. If the key already exists it is a no-op.
-	Save(ctx context.Context, key, requestHash string, responseCode int, responseBody []byte) error
+	// Save persists a new record inside tx — must be called within the same
+	// database transaction as the business insert so both are atomic.
+	Save(ctx context.Context, tx *sql.Tx, key, requestHash string, transactionID int64) error
 }

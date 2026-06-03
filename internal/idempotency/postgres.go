@@ -19,10 +19,10 @@ func NewPostgresStore(db *sql.DB) *PostgresStore {
 func (s *PostgresStore) Find(ctx context.Context, key string) (*Record, error) {
 	var r Record
 	err := s.db.QueryRowContext(ctx,
-		`SELECT key, request_hash, response_code, response_body, created_at
+		`SELECT key, request_hash, transaction_id, created_at
 		 FROM idempotency_keys WHERE key = $1`,
 		key,
-	).Scan(&r.Key, &r.RequestHash, &r.ResponseCode, &r.ResponseBody, &r.CreatedAt)
+	).Scan(&r.Key, &r.RequestHash, &r.TransactionID, &r.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -32,12 +32,12 @@ func (s *PostgresStore) Find(ctx context.Context, key string) (*Record, error) {
 	return &r, nil
 }
 
-func (s *PostgresStore) Save(ctx context.Context, key, requestHash string, responseCode int, responseBody []byte) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO idempotency_keys (key, request_hash, response_code, response_body)
-		 VALUES ($1, $2, $3, $4)
+func (s *PostgresStore) Save(ctx context.Context, tx *sql.Tx, key, requestHash string, transactionID int64) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO idempotency_keys (key, request_hash, transaction_id)
+		 VALUES ($1, $2, $3)
 		 ON CONFLICT (key) DO NOTHING`,
-		key, requestHash, responseCode, responseBody,
+		key, requestHash, transactionID,
 	)
 	if err != nil {
 		return fmt.Errorf("save idempotency key: %w", err)

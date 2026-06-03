@@ -34,13 +34,11 @@ CREATE TABLE IF NOT EXISTS transactions (
 -- This index makes queries filtering by account_id efficient.
 CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions (account_id);
 
--- Idempotency key store: caches the full HTTP response for each unique request key.
--- Allows safe retries — replaying the same key returns the original response without
--- re-executing the business operation.
+-- Idempotency key store: maps each client key to the transaction it created.
+-- Saved atomically inside the same db transaction as the business row.
 CREATE TABLE IF NOT EXISTS idempotency_keys (
     key            VARCHAR(255) PRIMARY KEY,
     request_hash   VARCHAR(64)  NOT NULL,
-    response_code  INT          NOT NULL,
-    response_body  JSONB        NOT NULL,
+    transaction_id BIGINT       NOT NULL REFERENCES transactions(transaction_id),
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
