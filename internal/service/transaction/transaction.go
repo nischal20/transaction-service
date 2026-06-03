@@ -58,6 +58,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID, o
 	// Idempotency check — before any writes.
 	if rec, err := s.idem.Find(ctx, idemKey); err != nil {
 		utils.Logf(ctx, "service: create transaction: idempotency lookup error: %v", err)
+		return nil, fmt.Errorf("idempotency lookup: %w", err)
 	} else if rec != nil {
 		if rec.RequestHash != idemHash {
 			return nil, apperr.Conflict("idempotency key reused with a different request body")
