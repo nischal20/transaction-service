@@ -5,6 +5,7 @@ A transactions service for managing cardholder accounts and financial operations
 ## Requirements
 
 - Go 1.23+
+- PostgreSQL
 - Docker & Docker Compose *(optional)*
 
 ---
@@ -12,23 +13,19 @@ A transactions service for managing cardholder accounts and financial operations
 ## Quick Start
 
 ```bash
-# Make the launcher executable (one-time setup)
-chmod +x run.sh
+# Copy env template and fill in your values
+cp .env.example .env
 
-# Run locally — in-memory storage, zero external dependencies
+# Apply database migrations
+psql "host=$DB_HOST port=$DB_PORT user=$DB_USER password=$DB_PASSWORD dbname=$DB_NAME sslmode=$DB_SSLMODE" \
+  -f migrations/001_init.sql \
+  -f migrations/002_audit_logs.sql
+
+# Run locally
 ./run.sh
 
-# Run via Docker — in-memory
-./run.sh docker
-
-# Run via Docker — PostgreSQL
+# Run via Docker (PostgreSQL included)
 ./run.sh postgres
-
-# Run tests (with race detector)
-./run.sh test
-
-# Run tests with coverage report
-./run.sh test:coverage
 ```
 
 - API: **http://localhost:8080**
@@ -42,48 +39,20 @@ The project uses [chi](https://github.com/go-chi/chi) as its HTTP router. chi is
 
 ---
 
-## Storage Backends
-
-| `DB_DRIVER` | Description |
-|-------------|-------------|
-| `memory` *(default)* | Thread-safe in-memory store — zero setup, no persistence |
-| `postgres` | PostgreSQL — individual `DB_*` fields are required |
-
-```bash
-# Run locally with PostgreSQL
-export DB_DRIVER=postgres
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DB_NAME=transactions
-export DB_SSLMODE=disable
-
-# Apply migrations
-psql "host=$DB_HOST port=$DB_PORT user=$DB_USER password=$DB_PASSWORD dbname=$DB_NAME sslmode=$DB_SSLMODE" \
-  -f migrations/001_init.sql \
-  -f migrations/002_audit_logs.sql
-
-./run.sh
-```
-
-Or copy `.env.example` to `.env` and fill in your values — `run.sh` loads it automatically.
-
----
-
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8080` | API listen port |
-| `DB_DRIVER` | `memory` | Storage backend (`memory` or `postgres`) |
-| `DB_HOST` | *(none)* | Postgres host — **required** when `DB_DRIVER=postgres` |
-| `DB_PORT` | *(none)* | Postgres port — **required** when `DB_DRIVER=postgres` |
-| `DB_USER` | *(none)* | Postgres user — **required** when `DB_DRIVER=postgres` |
-| `DB_PASSWORD` | *(none)* | Postgres password — **required** when `DB_DRIVER=postgres` |
-| `DB_NAME` | *(none)* | Postgres database name — **required** when `DB_DRIVER=postgres` |
-| `DB_SSLMODE` | *(none)* | Postgres SSL mode — **required** when `DB_DRIVER=postgres` |
+| `DB_HOST` | *(required)* | PostgreSQL host |
+| `DB_PORT` | *(required)* | PostgreSQL port |
+| `DB_USER` | *(required)* | PostgreSQL user |
+| `DB_PASSWORD` | *(required)* | PostgreSQL password |
+| `DB_NAME` | *(required)* | PostgreSQL database name |
+| `DB_SSLMODE` | *(required)* | PostgreSQL SSL mode (e.g. `disable`) |
 | `SWAGGER_PORT` | `9001` | Swagger UI port — set `""` to disable in production |
+
+Copy `.env.example` to `.env` and fill in your values — `run.sh` loads it automatically.
 
 ---
 
@@ -97,12 +66,81 @@ Every response includes an `X-Request-ID` header (UUID) for tracing requests acr
 
 ### Amount handling
 
-The API always accepts a **positive amount** in the request. The service applies the correct sign before storing based on operation type:
+Amounts are sent and received in **rupees** (decimal) but stored internally in **paise** (integer minor units, 1 rupee = 100 paise). The conversion happens at the HTTP boundary — all internal layers (service, repository, database) only deal with paise.
 
-- **Purchase / Withdrawal** (op types 1, 2, 3) — stored as **negative** (e.g. `50.0` → `-50.0`)
-- **Credit Voucher** (op type 4) — stored as **positive** (e.g. `60.0` → `60.0`)
+| Layer | Type | Example |
+|-------|------|---------|
+| API request / response | `float64` rupees | `123.45` |
+| Service, repository, DB (`BIGINT`) | `int64` paise | `12345` |
+
+The API always accepts a **positive amount**. The service applies the correct sign before storing based on operation type:
+
+- **Purchase / Withdrawal** (op types 1, 2, 3) — stored as **negative** (e.g. `₹50.00` → `-5000` paise)
+- **Credit Voucher** (op type 4) — stored as **positive** (e.g. `₹60.00` → `6000` paise)
 
 This follows the spec: *"Transactions of type purchase and withdrawal are registered with negative amounts, while transactions of credit voucher are registered with positive value."*
+
+---
+
+### Idempotency
+
+Every `POST /transactions` request **must** include an `X-Idempotency-Key` header — a client-generated unique string (e.g. an order ID or UUID) that identifies the intent of the request.
+
+```
+X-Idempotency-Key: order-abc-123
+```
+
+| Scenario | Behaviour |
+|----------|-----------|
+| First request with a key | Transaction is created, `201 Created` returned |
+| Same key + same body | Cached response returned byte-for-byte, no duplicate created |
+| Same key + **different** body | `422 Unprocessable Entity` — conflict detected |
+| Header missing | `400 Bad Request` |
+
+#### How it works — dedicated `idempotency_keys` table
+
+Idempotency is stored in its own table, completely separate from `transactions`:
+
+```sql
+CREATE TABLE idempotency_keys (
+    key            VARCHAR(255) PRIMARY KEY,
+    request_hash   VARCHAR(64)  NOT NULL,   -- SHA-256 of the raw request body
+    response_code  INT          NOT NULL,
+    response_body  JSONB        NOT NULL,   -- the exact HTTP response that was returned
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+```
+
+Advantages over a `UNIQUE` column on `transactions`:
+
+- **Full HTTP response cached** — replays return the exact same bytes, not a re-serialised model
+- **Conflict detection** — `request_hash` catches reuse of the same key with a different body
+- **Separation of concerns** — `transactions` stays pure business data; idempotency is infrastructure
+- **Independent TTL/cleanup** — expired keys can be purged without touching business rows
+- **Works for any endpoint** — not coupled to the transaction domain
+
+Handler flow on every `POST /transactions`:
+1. Read `X-Idempotency-Key` — reject if missing
+2. Hash the raw request body (SHA-256)
+3. Lookup `idempotency_keys` — if found and hash matches, return the cached response
+4. If found but hash differs — return `422`
+5. If not found — process the transaction, save `{key, hash, 201, response_body}`, return response
+
+**Example:**
+
+```bash
+# First call — creates the transaction
+curl -X POST http://localhost:8080/transactions \
+  -H "Content-Type: application/json" \
+  -H "X-Idempotency-Key: order-abc-123" \
+  -d '{"account_id": 1, "operation_type_id": 4, "amount": 112.34}'
+
+# Retry with the same key — returns the identical cached response, no new transaction
+curl -X POST http://localhost:8080/transactions \
+  -H "Content-Type: application/json" \
+  -H "X-Idempotency-Key: order-abc-123" \
+  -d '{"account_id": 1, "operation_type_id": 4, "amount": 112.34}'
+```
 
 ---
 
@@ -117,21 +155,7 @@ Every state-changing operation writes an entry to the `audit_logs` table (create
 
 Each entry captures the event type, affected resource, resource ID, and the `X-Request-ID` for cross-log tracing.
 
-**Atomicity (PostgreSQL mode)** — the business row insert and its audit log entry are written inside the **same `*sql.Tx`**. The service begins a transaction, passes it explicitly to both the repository `Create` call and the `audit.Logger.Log` call, then commits. If either write fails the whole transaction rolls back — the audit trail is always consistent with the `accounts` and `transactions` tables.
-
-**In-memory mode** — audit logging is a no-op (`NoopLogger`). If the audit write fails it is logged as a warning and the operation still succeeds.
-
----
-
-## Running Tests
-
-```bash
-# All tests with race detector
-./run.sh test
-
-# With coverage report
-./run.sh test:coverage
-```
+The business row insert and its audit log entry are written inside the **same `*sql.Tx`**. If either write fails the whole transaction rolls back — the audit trail is always consistent with the business tables.
 
 ---
 
@@ -141,20 +165,20 @@ Each entry captures the event type, affected resource, resource ID, and the `X-R
 .
 ├── cmd/api/              # Entry point — wires config, repos, services, handlers
 ├── config/               # Config loaded from environment variables
-├── database/             # DB Connector interface + PostgresConnector implementation
-├── migrations/           # SQL migrations for PostgreSQL mode (001_init, 002_audit_logs)
+├── database/             # PostgresConnector implementation
+├── migrations/           # SQL migrations (001_init, 002_audit_logs)
 ├── docs/                 # Swagger spec (generated by swaggo/swag — do not edit)
 ├── internal/
-│   ├── apperr/           # Typed error sentinels (ErrValidation, ErrConflict, ErrNotFound)
+│   ├── apperr/           # Typed error sentinels (ErrValidation, ErrNotFound)
 │   ├── dto/              # Request / response shapes for HTTP boundary
 │   ├── handler/          # Chi router, middleware, HTTP handlers
 │   │   ├── account/      # POST /accounts, GET /accounts/{accountId}
 │   │   └── transaction/  # POST /transactions
+│   ├── idempotency/      # Idempotency interface + PostgreSQL implementation
 │   ├── model/            # Domain structs and business constants
 │   ├── repository/
-│   │   ├── repository.go         # Interfaces + shared sentinels (ErrNotFound, ErrDuplicateDocument)
-│   │   ├── memory/account/       # In-memory AccountRepository
-│   │   ├── memory/transaction/   # In-memory TransactionRepository
+│   │   ├── account/              # AccountRepository interface
+│   │   ├── transaction/          # TransactionRepository interface
 │   │   ├── postgres/account/     # PostgreSQL AccountRepository
 │   │   └── postgres/transaction/ # PostgreSQL TransactionRepository
 │   ├── service/
@@ -164,5 +188,5 @@ Each entry captures the event type, affected resource, resource ID, and the `X-R
 ├── .env.example          # Config template — copy to .env and fill in values
 ├── Dockerfile
 ├── docker-compose.yml
-└── run.sh                # One-command launcher for all modes
+└── run.sh                # One-command launcher
 ```

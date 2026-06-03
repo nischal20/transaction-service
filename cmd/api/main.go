@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -25,12 +24,9 @@ import (
 	"github.com/nischalpatel/transactions-api/internal/handler"
 	handlerAccount "github.com/nischalpatel/transactions-api/internal/handler/account"
 	handlerTransaction "github.com/nischalpatel/transactions-api/internal/handler/transaction"
-	accountrepo "github.com/nischalpatel/transactions-api/internal/repository/account"
-	memaccount "github.com/nischalpatel/transactions-api/internal/repository/memory/account"
-	memtransaction "github.com/nischalpatel/transactions-api/internal/repository/memory/transaction"
+	"github.com/nischalpatel/transactions-api/internal/idempotency"
 	pgaccount "github.com/nischalpatel/transactions-api/internal/repository/postgres/account"
 	pgtransaction "github.com/nischalpatel/transactions-api/internal/repository/postgres/transaction"
-	txrepo "github.com/nischalpatel/transactions-api/internal/repository/transaction"
 	svcaccount "github.com/nischalpatel/transactions-api/internal/service/account"
 	svctransaction "github.com/nischalpatel/transactions-api/internal/service/transaction"
 )
@@ -41,43 +37,24 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	var (
-		accRepo accountrepo.Repository
-		txRepo  txrepo.Repository
-		auditor audit.Logger
-		db      *sql.DB // non-nil only in postgres mode; closed during shutdown
-	)
-
-	switch cfg.DBDriver {
-	case config.DBDriverPostgres:
-		db, err = database.NewPostgresConnector(database.PostgresConfig{
-			Host:     cfg.Postgres.Host,
-			Port:     cfg.Postgres.Port,
-			User:     cfg.Postgres.User,
-			Password: cfg.Postgres.Password,
-			DBName:   cfg.Postgres.DBName,
-			SSLMode:  cfg.Postgres.SSLMode,
-		}).Connect()
-		if err != nil {
-			log.Fatalf("postgres connect: %v", err)
-		}
-		accRepo = pgaccount.NewAccountStore(db)
-		txRepo = pgtransaction.NewTransactionStore(db)
-		auditor = audit.NewPostgresLogger(db)
-		log.Println("storage: PostgreSQL")
-
-	default:
-		accRepo = memaccount.NewAccountStore()
-		txRepo = memtransaction.NewTransactionStore()
-		auditor = audit.NoopLogger{}
-		log.Println("storage: in-memory")
+	db, err := database.NewPostgresConnector(database.PostgresConfig{
+		Host:     cfg.Postgres.Host,
+		Port:     cfg.Postgres.Port,
+		User:     cfg.Postgres.User,
+		Password: cfg.Postgres.Password,
+		DBName:   cfg.Postgres.DBName,
+		SSLMode:  cfg.Postgres.SSLMode,
+	}).Connect()
+	if err != nil {
+		log.Fatalf("postgres connect: %v", err)
 	}
+	log.Println("storage: PostgreSQL")
 
-	accSvc := svcaccount.NewAccountService(accRepo, auditor, db)
-	txSvc := svctransaction.NewTransactionService(txRepo, accRepo, auditor, db)
+	accSvc := svcaccount.NewAccountService(pgaccount.NewAccountStore(db), audit.NewPostgresLogger(db), db)
+	txSvc := svctransaction.NewTransactionService(pgtransaction.NewTransactionStore(db), pgaccount.NewAccountStore(db), audit.NewPostgresLogger(db), db)
 
 	accHandler := handlerAccount.NewAccountHandler(accSvc)
-	txHandler := handlerTransaction.NewTransactionHandler(txSvc)
+	txHandler := handlerTransaction.NewTransactionHandler(txSvc, idempotency.NewPostgresStore(db))
 
 	// ── API server ────────────────────────────────────────────────────────────
 	apiSrv := &http.Server{

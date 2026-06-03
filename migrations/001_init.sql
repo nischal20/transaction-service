@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_id    BIGSERIAL      PRIMARY KEY,
     account_id        BIGINT         NOT NULL REFERENCES accounts(account_id),
     operation_type_id BIGINT         NOT NULL REFERENCES operation_types(operation_type_id),
-    amount            NUMERIC(15, 2) NOT NULL CHECK (amount <> 0),
+    amount            BIGINT         NOT NULL,
     type              VARCHAR(6)     NOT NULL,
     event_date        TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );
@@ -33,3 +33,14 @@ CREATE TABLE IF NOT EXISTS transactions (
 -- FK constraints do NOT create indexes in Postgres automatically.
 -- This index makes queries filtering by account_id efficient.
 CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions (account_id);
+
+-- Idempotency key store: caches the full HTTP response for each unique request key.
+-- Allows safe retries — replaying the same key returns the original response without
+-- re-executing the business operation.
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key            VARCHAR(255) PRIMARY KEY,
+    request_hash   VARCHAR(64)  NOT NULL,
+    response_code  INT          NOT NULL,
+    response_body  JSONB        NOT NULL,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
