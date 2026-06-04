@@ -21,7 +21,7 @@ type Transaction struct {
 	TransactionID   int64     `json:"transaction_id"`
 	AccountID       int64     `json:"account_id"`
 	OperationTypeID int64     `json:"operation_type_id"`
-	Amount          int64     `json:"amount"`
+	Amount          float64   `json:"amount"`
 	Type            string    `json:"type"`
 	EventDate       time.Time `json:"event_date"`
 	CreatedAt       time.Time `json:"created_at"`

@@ -24,7 +24,7 @@ type AccountServicer interface {
 type AccountService struct {
 	repo    accountrepo.Repository
 	auditor audit.Logger
-	db      *sql.DB
+	db      *sql.DB // non-nil in postgres mode; used to begin db transactions
 }
 
 func NewAccountService(repo accountrepo.Repository, auditor audit.Logger, db *sql.DB) *AccountService {
@@ -32,8 +32,9 @@ func NewAccountService(repo accountrepo.Repository, auditor audit.Logger, db *sq
 }
 
 // CreateAccount validates input and persists a new account.
-// The account row and its audit entry are written inside a single database
-// transaction — both commit or both roll back.
+//
+// In PostgreSQL mode the account row and its audit entry are written inside a
+// single database transaction — both commit or both roll back.
 func (s *AccountService) CreateAccount(ctx context.Context, documentNumber string) (*model.Account, error) {
 	utils.Logf(ctx, "service: create account: document_number=%q", documentNumber)
 	documentNumber = strings.TrimSpace(documentNumber)
@@ -42,6 +43,14 @@ func (s *AccountService) CreateAccount(ctx context.Context, documentNumber strin
 		return nil, apperr.Validation("document_number is required")
 	}
 
+	if s.db != nil {
+		return s.createWithDBTx(ctx, documentNumber)
+	}
+	return s.createInMemory(ctx, documentNumber)
+}
+
+func (s *AccountService) createWithDBTx(ctx context.Context, documentNumber string) (*model.Account, error) {
+	utils.Logf(ctx, "service: create account: begin db tx")
 	sqlTx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin db tx: %w", err)
@@ -50,7 +59,7 @@ func (s *AccountService) CreateAccount(ctx context.Context, documentNumber strin
 	acc, err := s.repo.Create(ctx, sqlTx, documentNumber)
 	if err != nil {
 		_ = sqlTx.Rollback()
-		utils.Logf(ctx, "service: create account: rollback: repo error: %v", err)
+		utils.Logf(ctx, "service: create account: rollback db tx: repo error: %v", err)
 		if errors.Is(err, accountrepo.ErrDuplicateDocument) {
 			return nil, apperr.Conflict(err.Error())
 		}
@@ -66,7 +75,7 @@ func (s *AccountService) CreateAccount(ctx context.Context, documentNumber strin
 		RequestID:  utils.RequestIDFromCtx(ctx),
 	}); err != nil {
 		_ = sqlTx.Rollback()
-		utils.Logf(ctx, "service: create account: rollback: audit error: %v", err)
+		utils.Logf(ctx, "service: create account: rollback db tx: audit error: %v", err)
 		return nil, err
 	}
 
@@ -74,7 +83,29 @@ func (s *AccountService) CreateAccount(ctx context.Context, documentNumber strin
 		utils.Logf(ctx, "service: create account: commit failed: %v", err)
 		return nil, fmt.Errorf("commit db tx: %w", err)
 	}
-	utils.Logf(ctx, "service: create account: committed account_id=%d", acc.AccountID)
+	utils.Logf(ctx, "service: create account: committed db tx account_id=%d", acc.AccountID)
+	return acc, nil
+}
+
+func (s *AccountService) createInMemory(ctx context.Context, documentNumber string) (*model.Account, error) {
+	acc, err := s.repo.Create(ctx, nil, documentNumber)
+	if err != nil {
+		utils.Logf(ctx, "service: create account: repo error: %v", err)
+		if errors.Is(err, accountrepo.ErrDuplicateDocument) {
+			return nil, apperr.Conflict(err.Error())
+		}
+		return nil, err
+	}
+	utils.Logf(ctx, "service: create account: created account_id=%d", acc.AccountID)
+	if err := s.auditor.Log(ctx, nil, audit.Entry{
+		EventType:  audit.EventAccountCreated,
+		Resource:   "account",
+		ResourceID: acc.AccountID,
+		Actor:      utils.ActorFromCtx(ctx),
+		RequestID:  utils.RequestIDFromCtx(ctx),
+	}); err != nil {
+		utils.Logf(ctx, "service: create account: audit log warning (non-fatal): %v", err)
+	}
 	return acc, nil
 }
 

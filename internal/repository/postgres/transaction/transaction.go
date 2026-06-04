@@ -19,8 +19,8 @@ func NewTransactionStore(db *sql.DB) *TransactionStore {
 	return &TransactionStore{db: db}
 }
 
-func (s *TransactionStore) Create(ctx context.Context, tx *sql.Tx, accountID, operationTypeID int64, amount int64, txType string) (*model.Transaction, error) {
-	utils.Logf(ctx, "repo[postgres]: insert transaction account_id=%d op_type=%d amount=%d", accountID, operationTypeID, amount)
+func (s *TransactionStore) Create(ctx context.Context, tx *sql.Tx, accountID, operationTypeID int64, amount float64, txType string) (*model.Transaction, error) {
+	utils.Logf(ctx, "repo[postgres]: insert transaction account_id=%d op_type=%d amount=%.2f", accountID, operationTypeID, amount)
 	var t model.Transaction
 	err := tx.QueryRowContext(ctx,
 		`INSERT INTO transactions (account_id, operation_type_id, amount, type)
@@ -32,7 +32,7 @@ func (s *TransactionStore) Create(ctx context.Context, tx *sql.Tx, accountID, op
 		utils.Logf(ctx, "repo[postgres]: insert transaction error: %v", err)
 		return nil, fmt.Errorf("insert transaction: %w", err)
 	}
-	utils.Logf(ctx, "repo[postgres]: insert transaction ok transaction_id=%d type=%s amount=%d", t.TransactionID, t.Type, t.Amount)
+	utils.Logf(ctx, "repo[postgres]: insert transaction ok transaction_id=%d type=%s", t.TransactionID, t.Type)
 	return &t, nil
 }
 
