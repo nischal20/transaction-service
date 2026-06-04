@@ -16,7 +16,7 @@ type TransactionResponse struct {
 	TransactionID   int64   `json:"transaction_id"    example:"1"`
 	AccountID       int64   `json:"account_id"        example:"1"`
 	OperationTypeID int64   `json:"operation_type_id" example:"1"`
-	Amount          float64 `json:"amount"            example:"50.00"`
+	Amount          float64 `json:"amount"            example:"112.34"`
 	Type            string  `json:"type"              example:"debit"`
 	EventDate       string  `json:"event_date"        example:"2026-05-28T17:00:00Z"`
 }
