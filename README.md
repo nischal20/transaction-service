@@ -38,6 +38,49 @@ psql "host=$DB_HOST port=$DB_PORT user=$DB_USER password=$DB_PASSWORD dbname=$DB
 
 ---
 
+## Testing
+
+All tests use [`go-sqlmock`](https://github.com/DATA-DOG/go-sqlmock) and [`testify`](https://github.com/stretchr/testify) — no running database required.
+
+### Run all tests
+
+```bash
+./run.sh test
+```
+
+Runs the full test suite with the race detector enabled (`go test ./... -race -count=1`).
+
+### Run with coverage report
+
+```bash
+./run.sh test:coverage
+```
+
+Same as above, plus prints a per-function coverage breakdown to stdout.
+
+### Run a specific package
+
+```bash
+go test ./internal/service/transaction/ -v
+go test ./internal/handler/account/ -v
+go test ./internal/repository/postgres/account/ -v
+```
+
+### Test coverage by layer
+
+| Package | What is tested |
+|---------|---------------|
+| `internal/repository/postgres/account` | `Create` (success, duplicate, DB error), `FindByID` (success, not found, DB error) |
+| `internal/repository/postgres/transaction` | `Create`, `FindByID`, `FindOperationType` — success, not-found, and DB error paths |
+| `internal/service/account` | `CreateAccount` and `GetAccount` — all validation, conflict, not-found, repo, and audit error paths |
+| `internal/service/transaction` | All `CreateTransaction` paths including idempotency hit/conflict/race, `BeginTx`/`Commit` errors, and every rollback branch |
+| `internal/handler/account` | `CreateAccount` and `GetAccount` — all HTTP status codes (201, 200, 400, 404, 409, 500) |
+| `internal/handler/transaction` | `CreateTransaction` — all HTTP status codes (201, 400, 409, 422, 500), body-read error, amount conversion |
+| `internal/audit` | `Log` — success for both event types, empty actor/request-ID, DB error |
+| `internal/idempotency` | `Find` and `Save` — success, not-found, key conflict, DB error, `RowsAffected` error |
+
+---
+
 ## Router
 
 The project uses [chi](https://github.com/go-chi/chi) as its HTTP router. chi is 100% compatible with the Go standard library — every handler is a plain `http.HandlerFunc` and every middleware is a plain `func(http.Handler) http.Handler`, so it is easy to use and can be swapped out without touching any handler or middleware code.
