@@ -11,7 +11,7 @@ A transactions service for managing cardholder accounts and financial operations
 
 ## Quick Start
 
-### Option A — Docker (recommended, zero setup)
+### Option A — Docker
 
 ```bash
 ./run.sh docker
@@ -101,8 +101,6 @@ The project uses [chi](https://github.com/go-chi/chi) as its HTTP router. chi is
 | `DB_SSLMODE` | *(required)* | PostgreSQL SSL mode (`disable` for local dev) |
 | `SWAGGER_PORT` | `9001` | Swagger UI port — set `""` to disable in production |
 
-Copy `.env.example` to `.env` and fill in your values — `run.sh` loads it automatically on `./run.sh local`.
-
 ---
 
 ## API
@@ -149,24 +147,6 @@ X-Idempotency-Key: order-abc-123
 #### How it works — dedicated `idempotency_keys` table
 
 Idempotency is stored in its own table, completely separate from `transactions`:
-
-```sql
-CREATE TABLE idempotency_keys (
-    key            VARCHAR(255) PRIMARY KEY,
-    request_hash   VARCHAR(64)  NOT NULL,   -- SHA-256 of the raw request body
-    response_code  INT          NOT NULL,
-    response_body  JSONB        NOT NULL,   -- the exact HTTP response that was returned
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-);
-```
-
-Advantages over a `UNIQUE` column on `transactions`:
-
-- **Full HTTP response cached** — replays return the exact same bytes, not a re-serialised model
-- **Conflict detection** — `request_hash` catches reuse of the same key with a different body
-- **Separation of concerns** — `transactions` stays pure business data; idempotency is infrastructure
-- **Independent TTL/cleanup** — expired keys can be purged without touching business rows
-- **Works for any endpoint** — not coupled to the transaction domain
 
 Handler flow on every `POST /transactions`:
 1. Read `X-Idempotency-Key` — reject if missing

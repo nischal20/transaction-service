@@ -110,7 +110,7 @@ const docTemplate = `{
         },
         "/transactions": {
             "post": {
-                "description": "Records a financial operation against an existing account.\nOperation type IDs: 1=Normal Purchase, 2=Purchase with installments, 3=Withdrawal, 4=Credit Voucher.\nSend a positive amount. The server applies the correct sign based on operation type.",
+                "description": "Records a financial operation against an existing account.\nOperation type IDs: 1=Normal Purchase, 2=Purchase with installments, 3=Withdrawal, 4=Credit Voucher.\nSend a positive amount in rupees. The server applies the correct sign based on operation type.\nRequires the X-Idempotency-Key header. Replaying the same key returns the original response.",
                 "consumes": [
                     "application/json"
                 ],
@@ -122,6 +122,13 @@ const docTemplate = `{
                 ],
                 "summary": "Create a transaction",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique key to prevent duplicate submissions",
+                        "name": "X-Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "description": "Transaction payload",
                         "name": "body",
@@ -147,6 +154,12 @@ const docTemplate = `{
                     },
                     "405": {
                         "description": "Method Not Allowed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -190,6 +203,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "amount": {
+                    "description": "rupees; converted to paise (×100) before processing",
                     "type": "number"
                 },
                 "operation_type_id": {
@@ -215,7 +229,7 @@ const docTemplate = `{
                 },
                 "amount": {
                     "type": "number",
-                    "example": 50
+                    "example": 112.34
                 },
                 "event_date": {
                     "type": "string",
@@ -245,7 +259,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Transactions Service",
-	Description:      "Pismo-style transactions service. Manage cardholder accounts and record financial operations.",
+	Description:      "transactions service. Manage cardholder accounts and record financial operations.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
