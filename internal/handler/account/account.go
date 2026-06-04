@@ -59,7 +59,10 @@ func (h *AccountHandler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Logf(r.Context(), "handler: create account: success account_id=%d", acc.AccountID)
-	utils.WriteJSON(w, http.StatusCreated, acc)
+	utils.WriteJSON(w, http.StatusCreated, dto.AccountResponse{
+		AccountID:      acc.AccountID,
+		DocumentNumber: acc.DocumentNumber,
+	})
 }
 
 // GetAccount handles GET /accounts/{accountId}
@@ -100,5 +103,8 @@ func (h *AccountHandler) GetAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Logf(r.Context(), "handler: get account: success document_number=%q", acc.DocumentNumber)
-	utils.WriteJSON(w, http.StatusOK, acc)
+	utils.WriteJSON(w, http.StatusOK, dto.AccountResponse{
+		AccountID:      acc.AccountID,
+		DocumentNumber: acc.DocumentNumber,
+	})
 }
