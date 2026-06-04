@@ -2,9 +2,8 @@
 set -euo pipefail
 
 # Usage:
-#   ./run.sh                # run locally with in-memory storage (default)
-#   ./run.sh docker         # run via Docker (in-memory)
-#   ./run.sh postgres       # run via Docker with PostgreSQL
+#   ./run.sh                # run locally (requires .env with Postgres vars)
+#   ./run.sh docker         # run via Docker with PostgreSQL
 #   ./run.sh test           # run all tests with race detector
 #   ./run.sh test:coverage  # run all tests with coverage report
 
@@ -22,11 +21,7 @@ case "$MODE" in
     ;;
 
   docker)
-    docker compose --profile memory up --build
-    ;;
-
-  postgres)
-    docker compose --profile postgres up --build
+    docker compose up --build
     ;;
 
   test)
@@ -40,7 +35,7 @@ case "$MODE" in
     ;;
 
   *)
-    echo "Usage: $0 [local|docker|postgres|test|test:coverage]"
+    echo "Usage: $0 [local|docker|test|test:coverage]"
     exit 1
     ;;
 esac

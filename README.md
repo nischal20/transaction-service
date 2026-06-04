@@ -5,15 +5,27 @@ A transactions service for managing cardholder accounts and financial operations
 ## Requirements
 
 - Go 1.23+
-- PostgreSQL
-- Docker & Docker Compose *(optional)*
+- PostgreSQL 16+ (or Docker & Docker Compose)
 
 ---
 
 ## Quick Start
 
+### Option A — Docker (recommended, zero setup)
+
 ```bash
-# Copy env template and fill in your values
+./run.sh docker
+```
+
+Starts the API and a Postgres container. No other setup needed.
+
+- API: **http://localhost:8080**
+- Swagger UI: **http://localhost:9001/swagger/index.html**
+
+### Option B — Local (requires a running Postgres instance)
+
+```bash
+# Copy env template and fill in your Postgres credentials
 cp .env.example .env
 
 # Apply database migrations
@@ -21,15 +33,8 @@ psql "host=$DB_HOST port=$DB_PORT user=$DB_USER password=$DB_PASSWORD dbname=$DB
   -f migrations/001_init.sql \
   -f migrations/002_audit_logs.sql
 
-# Run locally
 ./run.sh
-
-# Run via Docker (PostgreSQL included)
-./run.sh postgres
 ```
-
-- API: **http://localhost:8080**
-- Swagger UI: **http://localhost:9001/swagger/index.html**
 
 ---
 
@@ -49,10 +54,10 @@ The project uses [chi](https://github.com/go-chi/chi) as its HTTP router. chi is
 | `DB_USER` | *(required)* | PostgreSQL user |
 | `DB_PASSWORD` | *(required)* | PostgreSQL password |
 | `DB_NAME` | *(required)* | PostgreSQL database name |
-| `DB_SSLMODE` | *(required)* | PostgreSQL SSL mode (e.g. `disable`) |
+| `DB_SSLMODE` | *(required)* | PostgreSQL SSL mode (`disable` for local dev) |
 | `SWAGGER_PORT` | `9001` | Swagger UI port — set `""` to disable in production |
 
-Copy `.env.example` to `.env` and fill in your values — `run.sh` loads it automatically.
+Copy `.env.example` to `.env` and fill in your values — `run.sh` loads it automatically on `./run.sh local`.
 
 ---
 
