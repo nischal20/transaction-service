@@ -33,7 +33,7 @@ func (s *PostgresStore) Find(ctx context.Context, key string) (*Record, error) {
 }
 
 func (s *PostgresStore) Save(ctx context.Context, tx *sql.Tx, key, requestHash string, transactionID int64) error {
-	_, err := tx.ExecContext(ctx,
+	res, err := tx.ExecContext(ctx,
 		`INSERT INTO idempotency_keys (key, request_hash, transaction_id)
 		 VALUES ($1, $2, $3)
 		 ON CONFLICT (key) DO NOTHING`,
@@ -41,6 +41,13 @@ func (s *PostgresStore) Save(ctx context.Context, tx *sql.Tx, key, requestHash s
 	)
 	if err != nil {
 		return fmt.Errorf("save idempotency key: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("save idempotency key: rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrKeyConflict
 	}
 	return nil
 }

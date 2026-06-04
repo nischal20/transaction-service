@@ -3,8 +3,13 @@ package idempotency
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 )
+
+// ErrKeyConflict is returned by Save when the key was already inserted by a
+// concurrent request (ON CONFLICT DO NOTHING → 0 rows affected).
+var ErrKeyConflict = errors.New("idempotency key already exists")
 
 // Record is the idempotency entry stored for a given key.
 type Record struct {

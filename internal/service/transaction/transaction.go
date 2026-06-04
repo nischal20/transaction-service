@@ -3,6 +3,7 @@ package transaction
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/nischalpatel/transactions-api/internal/apperr"
@@ -93,6 +94,19 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID, o
 
 	if err := s.idem.Save(ctx, sqlTx, idemKey, idemHash, tx.TransactionID); err != nil {
 		_ = sqlTx.Rollback()
+		if errors.Is(err, idempotency.ErrKeyConflict) {
+			// A concurrent request won the race — fetch and return their record.
+			utils.Logf(ctx, "service: create transaction: idempotency race lost, returning winner key=%s", idemKey)
+			rec, findErr := s.idem.Find(ctx, idemKey)
+			if findErr != nil {
+				return nil, fmt.Errorf("idempotency re-lookup after conflict: %w", findErr)
+			}
+			if rec == nil {
+				// Should not happen: we just lost a conflict, the row must exist.
+				return nil, fmt.Errorf("idempotency conflict but no record found for key=%s", idemKey)
+			}
+			return s.txRepo.FindByID(ctx, rec.TransactionID)
+		}
 		return nil, err
 	}
 
