@@ -25,9 +25,9 @@ func (s *TransactionStore) Create(ctx context.Context, tx *sql.Tx, accountID, op
 	err := tx.QueryRowContext(ctx,
 		`INSERT INTO transactions (account_id, operation_type_id, amount, type)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING transaction_id, account_id, operation_type_id, amount, type, event_date`,
+		 RETURNING transaction_id, account_id, operation_type_id, amount, type, event_date, created_at`,
 		accountID, operationTypeID, amount, txType,
-	).Scan(&t.TransactionID, &t.AccountID, &t.OperationTypeID, &t.Amount, &t.Type, &t.EventDate)
+	).Scan(&t.TransactionID, &t.AccountID, &t.OperationTypeID, &t.Amount, &t.Type, &t.EventDate, &t.CreatedAt)
 	if err != nil {
 		utils.Logf(ctx, "repo[postgres]: insert transaction error: %v", err)
 		return nil, fmt.Errorf("insert transaction: %w", err)
@@ -40,10 +40,10 @@ func (s *TransactionStore) FindByID(ctx context.Context, transactionID int64) (*
 	utils.Logf(ctx, "repo[postgres]: find transaction transaction_id=%d", transactionID)
 	var t model.Transaction
 	err := s.db.QueryRowContext(ctx,
-		`SELECT transaction_id, account_id, operation_type_id, amount, type, event_date
+		`SELECT transaction_id, account_id, operation_type_id, amount, type, event_date, created_at
 		 FROM transactions WHERE transaction_id = $1`,
 		transactionID,
-	).Scan(&t.TransactionID, &t.AccountID, &t.OperationTypeID, &t.Amount, &t.Type, &t.EventDate)
+	).Scan(&t.TransactionID, &t.AccountID, &t.OperationTypeID, &t.Amount, &t.Type, &t.EventDate, &t.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("transaction %d not found", transactionID)
 	}

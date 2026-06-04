@@ -24,6 +24,7 @@ type Transaction struct {
 	Amount          int64     `json:"amount"`
 	Type            string    `json:"type"`
 	EventDate       time.Time `json:"event_date"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // TransactionType returns "debit" or "credit" for the given operation type.

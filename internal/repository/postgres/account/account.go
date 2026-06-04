@@ -25,9 +25,9 @@ func (s *AccountStore) Create(ctx context.Context, tx *sql.Tx, documentNumber st
 	utils.Logf(ctx, "repo[postgres]: insert account document_number=%q", documentNumber)
 	var acc model.Account
 	err := tx.QueryRowContext(ctx,
-		`INSERT INTO accounts (document_number) VALUES ($1) RETURNING account_id, document_number`,
+		`INSERT INTO accounts (document_number) VALUES ($1) RETURNING account_id, document_number, created_at, updated_at`,
 		documentNumber,
-	).Scan(&acc.AccountID, &acc.DocumentNumber)
+	).Scan(&acc.AccountID, &acc.DocumentNumber, &acc.CreatedAt, &acc.UpdatedAt)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -45,9 +45,9 @@ func (s *AccountStore) FindByID(ctx context.Context, accountID int64) (*model.Ac
 	utils.Logf(ctx, "repo[postgres]: find account account_id=%d", accountID)
 	var acc model.Account
 	err := s.db.QueryRowContext(ctx,
-		`SELECT account_id, document_number FROM accounts WHERE account_id = $1`,
+		`SELECT account_id, document_number, created_at, updated_at FROM accounts WHERE account_id = $1`,
 		accountID,
-	).Scan(&acc.AccountID, &acc.DocumentNumber)
+	).Scan(&acc.AccountID, &acc.DocumentNumber, &acc.CreatedAt, &acc.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		utils.Logf(ctx, "repo[postgres]: find account not found account_id=%d", accountID)
 		return nil, accountrepo.ErrNotFound
