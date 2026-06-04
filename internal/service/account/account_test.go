@@ -103,6 +103,58 @@ func TestCreateAccount_WhitespaceDocumentNumber(t *testing.T) {
 	assert.True(t, errors.Is(err, apperr.ErrValidation))
 }
 
+func TestCreateAccount_DocumentNumberTooShort(t *testing.T) {
+	db, _ := newMockDB(t)
+	svc := svcaccount.NewAccountService(okRepo(), okAuditor(), db)
+
+	_, err := svc.CreateAccount(context.Background(), "123456789") // 9 digits
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, apperr.ErrValidation))
+}
+
+func TestCreateAccount_DocumentNumberTooLong(t *testing.T) {
+	db, _ := newMockDB(t)
+	svc := svcaccount.NewAccountService(okRepo(), okAuditor(), db)
+
+	_, err := svc.CreateAccount(context.Background(), "123456789012345") // 15 digits
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, apperr.ErrValidation))
+}
+
+func TestCreateAccount_DocumentNumberNonDigits(t *testing.T) {
+	db, _ := newMockDB(t)
+	svc := svcaccount.NewAccountService(okRepo(), okAuditor(), db)
+
+	_, err := svc.CreateAccount(context.Background(), "1234567abc")
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, apperr.ErrValidation))
+}
+
+func TestCreateAccount_DocumentNumberBoundaryMin(t *testing.T) {
+	db, mock := newMockDB(t)
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+
+	svc := svcaccount.NewAccountService(okRepo(), okAuditor(), db)
+	_, err := svc.CreateAccount(context.Background(), "1234567890") // exactly 10
+
+	require.NoError(t, err)
+}
+
+func TestCreateAccount_DocumentNumberBoundaryMax(t *testing.T) {
+	db, mock := newMockDB(t)
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+
+	svc := svcaccount.NewAccountService(okRepo(), okAuditor(), db)
+	_, err := svc.CreateAccount(context.Background(), "12345678901234") // exactly 14
+
+	require.NoError(t, err)
+}
+
 func TestCreateAccount_DuplicateDocument(t *testing.T) {
 	db, mock := newMockDB(t)
 	mock.ExpectBegin()

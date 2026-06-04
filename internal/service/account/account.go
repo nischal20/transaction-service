@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/nischalpatel/transactions-api/internal/apperr"
@@ -19,6 +20,8 @@ type AccountServicer interface {
 	CreateAccount(ctx context.Context, documentNumber string) (*model.Account, error)
 	GetAccount(ctx context.Context, accountID int64) (*model.Account, error)
 }
+
+var reOnlyDigits = regexp.MustCompile(`^\d+$`)
 
 // AccountService handles business logic for accounts.
 type AccountService struct {
@@ -40,6 +43,14 @@ func (s *AccountService) CreateAccount(ctx context.Context, documentNumber strin
 	if documentNumber == "" {
 		utils.Logf(ctx, "service: create account: validation failed: document_number is empty")
 		return nil, apperr.Validation("document_number is required")
+	}
+	if !reOnlyDigits.MatchString(documentNumber) {
+		utils.Logf(ctx, "service: create account: validation failed: document_number contains non-digit characters")
+		return nil, apperr.Validation("document_number must contain digits only")
+	}
+	if l := len(documentNumber); l < 10 || l > 14 {
+		utils.Logf(ctx, "service: create account: validation failed: document_number length=%d out of range [10,14]", l)
+		return nil, apperr.Validation("document_number must be between 10 and 14 digits")
 	}
 
 	sqlTx, err := s.db.BeginTx(ctx, nil)
