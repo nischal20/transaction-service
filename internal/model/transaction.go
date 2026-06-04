@@ -35,16 +35,6 @@ func TransactionType(operationTypeID int64) string {
 	return "credit"
 }
 
-// SeedOperationTypes returns the pre-defined operation types from the spec.
-func SeedOperationTypes() []OperationType {
-	return []OperationType{
-		{OperationTypeID: OperationNormalPurchase, Description: "Normal Purchase"},
-		{OperationTypeID: OperationPurchaseInstallments, Description: "Purchase with installments"},
-		{OperationTypeID: OperationWithdrawal, Description: "Withdrawal"},
-		{OperationTypeID: OperationCreditVoucher, Description: "Credit Voucher"},
-	}
-}
-
 // IsDebit returns true for operation types that should be stored as negative amounts.
 func IsDebit(operationTypeID int64) bool {
 	switch operationTypeID {
