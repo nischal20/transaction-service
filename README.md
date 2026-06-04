@@ -27,6 +27,7 @@ Starts the API and a Postgres container. No other setup needed.
 ```bash
 # Copy env template and fill in your Postgres credentials
 cp .env.example .env
+source .env
 
 # Apply database migrations
 psql "host=$DB_HOST port=$DB_PORT user=$DB_USER password=$DB_PASSWORD dbname=$DB_NAME sslmode=$DB_SSLMODE" \
